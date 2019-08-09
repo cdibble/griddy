@@ -101,6 +101,14 @@ nc_box <- function(nc.df.melted, bound.box){
 	return(val.out)
 }
 
+nc_diff <- function(nc.df, t.range1, t.range2){
+	d1 <- nc_plot(nc.df, time.range = t.range1)[['nc.df.melted']] # present
+	d2 <- nc_plot(nc.df, time.range = t.range2)[['nc.df.melted']] # present
+	d1 <- left_join(d1, d2, by = c("lat", "lon"), suffix = c(".present", ".future"))
+	d1$diff <- d1$var.future - d1$var.present
+	return(d1)
+}
+
 'sos' # sea surface salinity
 'tos' # sea surface temperature
 'ph' # surface pH
@@ -111,13 +119,20 @@ directory.path.ts = '/Users/Connor/Documents/Graduate School/Dibble_Research/Dis
 directory.path.bg = '/Users/Connor/Documents/Graduate School/Dibble_Research/Dispersal_ClimateChange_Paper/CMIP/wget-20190807202515-NCDFfiles/' # biogeochem
 # 	var.files <- list.files(path = directory.path.bg, pattern = 'ph_')
 # 	var.files <- list.files(path = directory.path.bg, pattern = '^o2_')
-# aa <- nc_cat(directory.path.bg, var.name = 'ph') # ph
+aa <- nc_cat(directory.path.bg, var.name = 'o2') # ph
 # aa <- nc_cat(directory.path.bg, var.name = 'o2') # o2
 
 time.range <- c("2090-01-01", "2100-12-31")
 # time.range <- c("2100-01-01")
 # time.range <- c("2050-01-01")
 # dimnames(aa[['dat.array']])[2] <- round(dimnames(aa[['dat.array']])[2] )
+time.range.1 <- c("2018-06-01", "2019-06-01")
+time.range.2 <- c("2095-06-01", "2096-06-01")
+aa <- nc_cat(directory.path.bg, var.name = 'ph') # ph
+
+diff.df <- nc_diff(nc.df = aa[['dat.array']], t.range1 = time.range.1, t.range2 = time.range.2)
+ggplot(diff.df) + geom_raster(aes(x = lon, y = lat, fill = diff)) + scale_fill_viridis()
+
 p1 <- nc_plot(aa[['dat.array']], time.range = time.range)
 p1[['nc.plot']]
 
