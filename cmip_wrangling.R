@@ -72,15 +72,16 @@
 		return(list(dat.array = data.array, meta.dat = meta.data))
 	}
 
-	nc_plot <- function(nc.df, time.range){
-		require(viridis); require(ggplot2);
+	nc_plot <- function(nc.df, time.range, funn = 'mean'){
+		require(viridis); require(ggplot2);require(reshape2)
 		times <- as.POSIXct(as.numeric(dimnames(nc.df)[3][[1]]), origin = '1970-01-01')	
 		if(length(time.range) == 2){ # average over time range
 			begin <- min(which(times >= time.range[1]), na.rm = TRUE)
 			ending <- max(which(times <= time.range[2]), na.rm = TRUE)
 			cat('\n'); print(times[begin]); cat('\n'); print(times[ending])
 			nc.plot <- nc.df[,, begin:ending ] / length(begin:ending)
-			nc.plot <- apply(nc.df[,, begin:ending ], c(1,2), mean, na.rm = TRUE)
+			# nc.plot <- apply(nc.df[,, begin:ending ], c(1,2), mean, na.rm = TRUE)
+			nc.plot <- apply(nc.df[,, begin:ending ], c(1,2), funn, na.rm = TRUE)
 		}
 		if(length(time.range) == 1){
 			nc.plot <- nc.df[,, min(which(times >= time.range), na.rm = TRUE) ]
@@ -97,9 +98,10 @@
 		return(list(nc.df.melted = nc.melt, nc.plot = plot.out))
 	}
 
-	nc_box <- function(nc.df.melted, bound.box){
+	nc_box <- function(nc.df.melted, bound.box, funn = 'mean'){
 		nc.df.m <- dplyr::filter(nc.df.melted, lat <= bound.box$max.lat, lat >= bound.box$min.lat, lon <= bound.box$max.lon, lon >= bound.box$min.lon)
-		val.out <- mean(nc.df.m$var, na.rm = TRUE)
+		# val.out <- mean(nc.df.m$var, na.rm = TRUE)
+		val.out <- do.call(funn, list(nc.df.m$var, na.rm = TRUE))
 		return(val.out)
 	}
 	# dplyr::filter(nc_plot(nc_cat(directory.path.ts, var.name = 'sos')[['dat.array']], time.range = time.range)[['nc.df.melted']], lat <= bound.box$max.lat, lat >= bound.box$min.lat, lon <= bound.box$max.lon, lon >= bound.box$min.lon)
@@ -114,71 +116,83 @@
 # ======================================================================================================================================================
 # Dispersal in a Changing Ocean
 # ======================================================================================================================================================
+	'sos' # sea surface salinity
+	'tos' # sea surface temperature
+	'ph' # surface pH
+	'o2' # dissolved oxygen at surface
+	directory.path.ts = '/Users/Connor/Documents/Graduate School/Dibble_Research/Dispersal_ClimateChange_Paper/CMIP/wget-20190807152516-NCDFfiles/' # temp/salin
+	# aa <- nc_cat(directory.path.ts, var.name = 'sos') # salinity
+	# aa <- nc_cat(directory.path.ts, var.name = 'tos') # temperature
+	directory.path.bg = '/Users/Connor/Documents/Graduate School/Dibble_Research/Dispersal_ClimateChange_Paper/CMIP/wget-20190807202515-NCDFfiles/' # biogeochem
+	# 	var.files <- list.files(path = directory.path.bg, pattern = 'ph_')
+	# 	var.files <- list.files(path = directory.path.bg, pattern = '^o2_')
+	aa <- nc_cat(directory.path.bg, var.name = 'o2') # ph
+	# aa <- nc_cat(directory.path.bg, var.name = 'o2') # o2
 
-'sos' # sea surface salinity
-'tos' # sea surface temperature
-'ph' # surface pH
-'o2' # dissolved oxygen at surface
-directory.path.ts = '/Users/Connor/Documents/Graduate School/Dibble_Research/Dispersal_ClimateChange_Paper/CMIP/wget-20190807152516-NCDFfiles/' # temp/salin
-# aa <- nc_cat(directory.path.ts, var.name = 'sos') # salinity
-# aa <- nc_cat(directory.path.ts, var.name = 'tos') # temperature
-directory.path.bg = '/Users/Connor/Documents/Graduate School/Dibble_Research/Dispersal_ClimateChange_Paper/CMIP/wget-20190807202515-NCDFfiles/' # biogeochem
-# 	var.files <- list.files(path = directory.path.bg, pattern = 'ph_')
-# 	var.files <- list.files(path = directory.path.bg, pattern = '^o2_')
-aa <- nc_cat(directory.path.bg, var.name = 'o2') # ph
-# aa <- nc_cat(directory.path.bg, var.name = 'o2') # o2
+	time.range <- c("2090-01-01", "2100-12-31")
+	# time.range <- c("2100-01-01")
+	# time.range <- c("2050-01-01")
+	# dimnames(aa[['dat.array']])[2] <- round(dimnames(aa[['dat.array']])[2] )
+	time.range.1 <- c("2018-06-01", "2019-06-01")
+	time.range.2 <- c("2095-06-01", "2096-06-01")
+	aa <- nc_cat(directory.path.bg, var.name = 'ph') # ph
+	range(as.POSIXct(as.numeric(dimnames(aa[['dat.array']])[[3]]), origin = "1970-01-01"))
 
-time.range <- c("2090-01-01", "2100-12-31")
-# time.range <- c("2100-01-01")
-# time.range <- c("2050-01-01")
-# dimnames(aa[['dat.array']])[2] <- round(dimnames(aa[['dat.array']])[2] )
-time.range.1 <- c("2018-06-01", "2019-06-01")
-time.range.2 <- c("2095-06-01", "2096-06-01")
-aa <- nc_cat(directory.path.bg, var.name = 'ph') # ph
-range(as.POSIXct(as.numeric(dimnames(aa[['dat.array']])[[3]]), origin = "1970-01-01"))
+	diff.df <- nc_diff(nc.df = aa[['dat.array']], t.range1 = time.range.1, t.range2 = time.range.2)
+		ggplot(diff.df) + geom_raster(aes(x = lon, y = lat, fill = diff)) + scale_fill_gradient2()
 
-diff.df <- nc_diff(nc.df = aa[['dat.array']], t.range1 = time.range.1, t.range2 = time.range.2)
-	ggplot(diff.df) + geom_raster(aes(x = lon, y = lat, fill = diff)) + scale_fill_gradient2()
+	p1 <- nc_plot(aa[['dat.array']], time.range = time.range)
+	p1[['nc.plot']]
 
-p1 <- nc_plot(aa[['dat.array']], time.range = time.range)
-p1[['nc.plot']]
+	# Temperature - is in kelvin.
+	p1.m <- p1[["nc.df.melted"]]
+	p1.m$var <- p1.m$var - 271
+	ggplot(p1.m) + geom_raster(aes(x = lon, y = lat, fill = var)) + scale_fill_viridis() + theme_bw()
 
-# Temperature - is in kelvin.
-p1.m <- p1[["nc.df.melted"]]
-p1.m$var <- p1.m$var - 271
-ggplot(p1.m) + geom_raster(aes(x = lon, y = lat, fill = var)) + scale_fill_viridis() + theme_bw()
+	# Tropical Pacific Boundary Box.test
+	bound.box = data.frame(min.lat = 0, max.lat = 20, min.lon = -150, max.lon = -100)
+	nc_box(p1[['nc.df.melted']], bound.box)
 
-# Tropical Pacific Boundary Box.test
-bound.box = data.frame(min.lat = 0, max.lat = 20, min.lon = -150, max.lon = -100)
-nc_box(p1[['nc.df.melted']], bound.box)
+	# Tropical IndoPacific: lizard island
+	bound.box = data.frame(min.lat = -15, max.lat = -13, min.lon = 145, max.lon = 147)
+	# time.range <- c("2100-01-01", "2100-12-31")
+	# time.range <- c("2096-01-01", "2096-12-31") # FUTURE
+	time.range <- c("2016-01-01", "2016-12-31") # PRESENT
+	nc_box(nc_plot(nc_cat(directory.path.ts, var.name = 'sos')[['dat.array']], time.range = time.range)[['nc.df.melted']], bound.box)
+	nc_box(nc_plot(nc_cat(directory.path.ts, var.name = 'sos')[['dat.array']], time.range = time.range, funn = 'sd')[['nc.df.melted']], bound.box)
+	nc_box(nc_plot(nc_cat(directory.path.ts, var.name = 'tos')[['dat.array']], time.range = time.range)[['nc.df.melted']], bound.box)
+	nc_box(nc_plot(nc_cat(directory.path.ts, var.name = 'tos')[['dat.array']], time.range = time.range, funn = 'sd')[['nc.df.melted']], bound.box)
+	# time.range <- c("2096-01-01", "2096-12-31")
+	nc_box(nc_plot(nc_cat(directory.path.bg, var.name = 'ph')[['dat.array']], time.range = time.range)[['nc.df.melted']], bound.box)
+	nc_box(nc_plot(nc_cat(directory.path.bg, var.name = 'ph')[['dat.array']], time.range = time.range, funn = 'sd')[['nc.df.melted']], bound.box)
+	nc_box(nc_plot(nc_cat(directory.path.bg, var.name = 'o2')[['dat.array']], time.range = time.range)[['nc.df.melted']], bound.box)
+	nc_box(nc_plot(nc_cat(directory.path.bg, var.name = 'o2')[['dat.array']], time.range = time.range, funn = 'sd')[['nc.df.melted']], bound.box)
 
-# Tropical IndoPacific: lizard island
-bound.box = data.frame(min.lat = -15, max.lat = -13, min.lon = 145, max.lon = 147)
-# time.range <- c("2100-01-01", "2100-12-31")
-time.range <- c("2096-01-01", "2096-12-31")
-nc_box(nc_plot(nc_cat(directory.path.ts, var.name = 'sos')[['dat.array']], time.range = time.range)[['nc.df.melted']], bound.box)
-nc_box(nc_plot(nc_cat(directory.path.ts, var.name = 'tos')[['dat.array']], time.range = time.range)[['nc.df.melted']], bound.box)
-time.range <- c("2096-01-01", "2096-12-31")
-nc_box(nc_plot(nc_cat(directory.path.bg, var.name = 'ph')[['dat.array']], time.range = time.range)[['nc.df.melted']], bound.box)
-nc_box(nc_plot(nc_cat(directory.path.bg, var.name = 'o2')[['dat.array']], time.range = time.range)[['nc.df.melted']], bound.box)
+	# Temperate Pacific - San Diego
+	bound.box = data.frame(min.lat = 31.5, max.lat = 33.5, min.lon = -119.2, max.lon = -117.2)
+	# time.range <- c("2100-01-01", "2100-12-31")
+	# time.range <- c("2096-01-01", "2096-12-31")
+	nc_box(nc_plot(nc_cat(directory.path.ts, var.name = 'sos')[['dat.array']], time.range = time.range)[['nc.df.melted']], bound.box)
+	nc_box(nc_plot(nc_cat(directory.path.ts, var.name = 'sos')[['dat.array']], time.range = time.range, funn = 'sd')[['nc.df.melted']], bound.box)
+	nc_box(nc_plot(nc_cat(directory.path.ts, var.name = 'tos')[['dat.array']], time.range = time.range)[['nc.df.melted']], bound.box)
+	nc_box(nc_plot(nc_cat(directory.path.ts, var.name = 'tos')[['dat.array']], time.range = time.range, funn = 'sd')[['nc.df.melted']], bound.box)
+	# time.range <- c("2096-01-01", "2096-12-31")
+	nc_box(nc_plot(nc_cat(directory.path.bg, var.name = 'ph')[['dat.array']], time.range = time.range)[['nc.df.melted']], bound.box)
+	nc_box(nc_plot(nc_cat(directory.path.bg, var.name = 'ph')[['dat.array']], time.range = time.range, funn = 'sd')[['nc.df.melted']], bound.box)
+	nc_box(nc_plot(nc_cat(directory.path.bg, var.name = 'o2')[['dat.array']], time.range = time.range)[['nc.df.melted']], bound.box)
+	nc_box(nc_plot(nc_cat(directory.path.bg, var.name = 'o2')[['dat.array']], time.range = time.range, funn = 'sd')[['nc.df.melted']], bound.box)
 
-# Temperate Pacific - San Diego
-bound.box = data.frame(min.lat = 31.5, max.lat = 33.5, min.lon = -119.2, max.lon = -117.2)
-# time.range <- c("2100-01-01", "2100-12-31")
-time.range <- c("2096-01-01", "2096-12-31")
-nc_box(nc_plot(nc_cat(directory.path.ts, var.name = 'sos')[['dat.array']], time.range = time.range)[['nc.df.melted']], bound.box)
-nc_box(nc_plot(nc_cat(directory.path.ts, var.name = 'tos')[['dat.array']], time.range = time.range)[['nc.df.melted']], bound.box)
-time.range <- c("2096-01-01", "2096-12-31")
-nc_box(nc_plot(nc_cat(directory.path.bg, var.name = 'ph')[['dat.array']], time.range = time.range)[['nc.df.melted']], bound.box)
-nc_box(nc_plot(nc_cat(directory.path.bg, var.name = 'o2')[['dat.array']], time.range = time.range)[['nc.df.melted']], bound.box)
-
-# Temperate Pacific - Monterey
-# bound.box = data.frame(min.lat = 35, max.lat = 37, min.lon = -123.5, max.lon = -121.5)
-bound.box = data.frame(min.lat = 35, max.lat = 37, min.lon = -124, max.lon = -122)
-# time.range <- c("2100-01-01", "2100-12-31")
-time.range <- c("2096-01-01", "2096-12-31")
-nc_box(nc_plot(nc_cat(directory.path.ts, var.name = 'sos')[['dat.array']], time.range = time.range)[['nc.df.melted']], bound.box)
-nc_box(nc_plot(nc_cat(directory.path.ts, var.name = 'tos')[['dat.array']], time.range = time.range)[['nc.df.melted']], bound.box)
-time.range <- c("2096-01-01", "2096-12-31")
-nc_box(nc_plot(nc_cat(directory.path.bg, var.name = 'ph')[['dat.array']], time.range = time.range)[['nc.df.melted']], bound.box)
-nc_box(nc_plot(nc_cat(directory.path.bg, var.name = 'o2')[['dat.array']], time.range = time.range)[['nc.df.melted']], bound.box)
+	# Temperate Pacific - Monterey
+	# bound.box = data.frame(min.lat = 35, max.lat = 37, min.lon = -123.5, max.lon = -121.5)
+	bound.box = data.frame(min.lat = 35, max.lat = 37, min.lon = -124, max.lon = -122)
+	# time.range <- c("2100-01-01", "2100-12-31")
+	# time.range <- c("2096-01-01", "2096-12-31")
+	nc_box(nc_plot(nc_cat(directory.path.ts, var.name = 'sos')[['dat.array']], time.range = time.range)[['nc.df.melted']], bound.box)
+	nc_box(nc_plot(nc_cat(directory.path.ts, var.name = 'sos')[['dat.array']], time.range = time.range, funn = 'sd')[['nc.df.melted']], bound.box)
+	nc_box(nc_plot(nc_cat(directory.path.ts, var.name = 'tos')[['dat.array']], time.range = time.range)[['nc.df.melted']], bound.box)
+	nc_box(nc_plot(nc_cat(directory.path.ts, var.name = 'tos')[['dat.array']], time.range = time.range, funn = 'sd')[['nc.df.melted']], bound.box)
+	# time.range <- c("2096-01-01", "2096-12-31")
+	nc_box(nc_plot(nc_cat(directory.path.bg, var.name = 'ph')[['dat.array']], time.range = time.range)[['nc.df.melted']], bound.box)
+	nc_box(nc_plot(nc_cat(directory.path.bg, var.name = 'ph')[['dat.array']], time.range = time.range, funn = 'sd')[['nc.df.melted']], bound.box)
+	nc_box(nc_plot(nc_cat(directory.path.bg, var.name = 'o2')[['dat.array']], time.range = time.range)[['nc.df.melted']], bound.box)
+	nc_box(nc_plot(nc_cat(directory.path.bg, var.name = 'o2')[['dat.array']], time.range = time.range, funn = 'sd')[['nc.df.melted']], bound.box)
